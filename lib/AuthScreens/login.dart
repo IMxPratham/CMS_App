@@ -1,0 +1,308 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hyperconnect_cms_app/AuthScreens/signup.dart';
+import 'package:hyperconnect_cms_app/Provider/theme.dart' as provider_theme;
+import 'package:hyperconnect_cms_app/Views/ContactScreen.dart';
+import 'package:flutter/material.dart';
+import 'package:hyperconnect_cms_app/services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:hyperconnect_cms_app/main.dart';
+import 'package:hyperconnect_cms_app/services/database_services.dart';
+
+class LoginScreen extends StatefulWidget {
+  final AuthService _auth = AuthService();
+
+  // const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLargeScreen = screenWidth > 800;
+
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text("HyperConnect",
+            style: TextStyle(fontSize: 30, color: Colors.white)),
+        actions: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
+            ),
+          ),
+        ],
+        backgroundColor: Colors.blueGrey,
+      ),
+      resizeToAvoidBottomInset: false,
+      endDrawer: Drawer(
+        child: Container(
+          color: Theme.of(context)
+              .drawerTheme
+              .backgroundColor, // Theme-based color
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration:
+                    BoxDecoration(color: Theme.of(context).primaryColor),
+                child: Center(
+                  child: Text(
+                    'Settings',
+                    style: TextStyle(color: Colors.white, fontSize: 30),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Icon(Icons.dark_mode,
+                    color: Theme.of(context).iconTheme.color),
+                title: Text(
+                  'Dark Mode',
+                  style: TextStyle(
+                      fontSize: 25,
+                      color: Theme.of(context).textTheme.bodyLarge!.color),
+                ),
+                trailing: Consumer<ThemeProvider>(
+                  builder: (context, themeProvider, child) {
+                    return Switch(
+                      value: themeProvider.isDarkMode,
+                      onChanged: (value) {
+                        themeProvider.toggleTheme();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+            ),
+            child: Center(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Welcome Back",
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+                    Container(
+                      height: isLargeScreen
+                          ? constraints.maxHeight * 0.5
+                          : constraints.maxHeight * 0.5,
+                      width: isLargeScreen
+                          ? constraints.maxWidth * 0.5
+                          : constraints.maxWidth * 0.8,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.all(10),
+                              labelText: 'Email',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              prefixIcon: Icon(Icons.email,
+                                  color: Theme.of(context).iconTheme.color),
+                            ),
+                            validator: (value) => value == null || value.isEmpty
+                                ? "Email is required"
+                                : null,
+                          ),
+                          TextFormField(
+                            controller: _passController,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.all(10),
+                              labelText: 'Password',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              prefixIcon: Icon(Icons.lock,
+                                  color: Theme.of(context).iconTheme.color),
+                            ),
+                            validator: (value) => value == null || value.isEmpty
+                                ? "Password is required"
+                                : null,
+                          ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                if (_formKey.currentState!.validate()) { 
+                                  try {
+                                    User? user = await widget._auth
+                                        .signInWithEmailAndPassword(
+                                      _emailController.text.trim(),
+                                      _passController.text.trim(),
+                                    );
+                                    if (user != null) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Login successful!"),
+                                          backgroundColor: Colors.green,
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const ContactScreen(),
+                                        ),
+                                      );
+                                    }
+                                  } on FirebaseAuthException catch (e) {
+                                    if (e.code == 'user-not-found') {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              "No user found with this email."),
+                                          backgroundColor: Colors.red,
+                                          duration: Duration(seconds: 3),
+                                        ),
+                                      );
+                                    } else if (e.code == 'wrong-password') {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content:
+                                              Text("Password is incorrect."),
+                                          backgroundColor: Colors.red,
+                                          duration: Duration(seconds: 3),
+                                        ),
+                                      );
+                                    } else if (e.code == 'invalid-email') {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              "Enter a valid email address."),
+                                          backgroundColor: Colors.orange,
+                                          duration: Duration(seconds: 3),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              "Login failed: ${e.message}"),
+                                          backgroundColor: Colors.red,
+                                          duration: const Duration(seconds: 3),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            "An error occurred: ${e.toString()}"),
+                                        backgroundColor: Colors.red,
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          "Please fill in all required fields."),
+                                      backgroundColor: Colors.orange,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueGrey,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              child: const Text(
+                                "Sign In",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "Don't have an account?",
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SignupScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        "Sign Up",
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+    );
+  }
+}
